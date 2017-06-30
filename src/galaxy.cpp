@@ -2,7 +2,7 @@
 
 
 Galaxy::Galaxy() {
-	radius = 60.1f;
+	radius = 60.0f;
 }
 
 Galaxy::Galaxy(float rad) {
@@ -26,7 +26,7 @@ void Galaxy::setParams(float rad) {
 void Galaxy::draw() {
 	glPushMatrix();
 
-		glColor3f(0.5f, 0.5f, 0.5f);
+		glColor3f(0.0f, 0.0f, 0.0f); // Black color
 
 		// enable texture mapping
 		glEnable(GL_TEXTURE_2D);
@@ -38,7 +38,7 @@ void Galaxy::draw() {
 		GLUquadric* quad = gluNewQuadric();
 		gluQuadricOrientation(quad, GLU_INSIDE);
 		gluQuadricTexture(quad, GLU_TRUE);
-		gluSphere(quad, radius, 40, 40);
+		gluSphere(quad, radius, 100, 100);
 
 		glDisable(GL_TEXTURE_2D);
 

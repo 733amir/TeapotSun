@@ -1,157 +1,219 @@
-/* TEAPOT SUN v2.0 (textured solar system generator)
-	by ANDREW GOLDIN (adg2160) */
+/*
+ * Solar System Simulation
+ * Written by Amir Khazaie (733amir@gmail.com)
+ *
+ * This project is for Computer Graphics course by Dr. Maziar Palhang,
+ * held in Isfahan University of Technology.
+ */
 
-//#elif defined(__linux)
-#if defined(__APPLE__) || defined(MACOSX)
-#   include <GLUT/glut.h>
-#else
-#   include <GL/glut.h>
-#endif
-
-#include <stdlib.h>
-#include <stdio.h>
+// External Libraries
 #include <math.h>
 #include <iostream>
-#include <time.h>
+#include <GL/glut.h>
+
+// My Modules
 #include "planet.h"
 #include "galaxy.h"
 
-//using namespace std;
+// Constants
+const float pi = 3.141592654f;
 
 // values for mouse movement and camera control
-float xpos = 0, ypos = 0, zpos = 0, xrot = 0, yrot = 0, angle = 0.0;
-float lastx, lasty;
+float xpos = 0, ypos = 0, zpos = 0, xrot = 25, yrot = 30;
 
 // values for planets
 const int num_planets = 8; // number of planets in system
-const int num_asteroids = 10; // number of asteroids in the teapot belt
-float asteroids_distance;
 
 Galaxy galaxy;
 Planet sun;
 Planet planets[num_planets];
-Asteroid asteroids[num_asteroids];
 
 float speedMult; // the movement speed multiplier, affected by keyboard input
+float movementSpeed; // low values means faster movement speed
 
 bool* keyStates = new bool[256]; // boolean array to track multiple keypresses
 
 
-// sets the initial values for each planet and teapot at random
-void reset (void) {
-	for (int i = 0; i < 256; i++) keyStates[i] = false; // no keys pressed at start
+// Initialization
+void galaxyInitialization(void) {
+    float orbitsScale = 20, orbitsStart = 50;
+    float diameterScale = 1;
+    float revSpeedMult = 0.1, rotSpeedMult = 1.0;
 
-	// set the properties of each planet
-	for (int i = 0; i < num_planets; i++) {
-		planets[i].randomize();
-	}
+    // No key press at start, so initialize them to false at start.
+	for (int i = 0; i < 256; i++) keyStates[i] = false;
 
-	asteroids_distance = (float) (rand() % 50) + 3;
-	for (int i = 0; i < num_asteroids; i++) {
-		asteroids[i].randomize();
-		asteroids[i].distance = asteroids_distance;
-	}
+    // Speed of planets orbiting the sun in the galaxy.
+    speedMult = 0.0;
+    // Speed of camera movement.
+    movementSpeed = 1.0;
+
+	// Galaxy
+    galaxy = Galaxy(10000.0f);
+    galaxy.setTexture("res/galaxy.bmp");
+
+    // Planet parameters are distance, radius, rotSpeed, revSpeed, inclinationDegree, obliquityDegree.
+
+    // Sun
+    sun.setParams(0.0f, 25.0f, (1/10.0f) * rotSpeedMult, 0.0f, 0, 0);
+    sun.changeSpeed(speedMult);
+    sun.setTexture("res/sun.bmp");
+
+    // Mercury
+    planets[0].setParams(0.387f * orbitsScale + orbitsStart, 0.383f * diameterScale,
+                         (1/58.8f) * rotSpeedMult, 1.59f * revSpeedMult, 7, 0.034);
+    planets[0].changeSpeed(speedMult);
+    planets[0].setTexture("res/planet_0.bmp");
+
+    // Venus
+    planets[1].setParams(0.723f * orbitsScale + orbitsStart, 0.949f * diameterScale,
+                         (1/244.0f) * rotSpeedMult, 1.18f * revSpeedMult, 3.4, 177.4);
+    planets[1].changeSpeed(speedMult);
+    planets[1].setTexture("res/planet_1.bmp");
+
+    // Earth
+    planets[2].setParams(1.0f * orbitsScale + orbitsStart, 1.0f * diameterScale,
+                         (1/1.0f) * rotSpeedMult, 1.0f * revSpeedMult, 0, 23.4);
+    planets[2].changeSpeed(speedMult);
+    planets[2].setTexture("res/planet_2.bmp");
+
+    // Mars
+    planets[3].setParams(1.52f * orbitsScale + orbitsStart, 0.532f * diameterScale,
+                         (1/1.03f) * rotSpeedMult, 0.808f * revSpeedMult, 1.9, 25.2);
+    planets[3].changeSpeed(speedMult);
+    planets[3].setTexture("res/planet_3.bmp");
+
+    // Jupiter
+    planets[4].setParams(5.2f * orbitsScale + orbitsStart, 11.21f * diameterScale,
+                         (1/0.415f) * rotSpeedMult, 0.439f * revSpeedMult, 1.3, 3.1);
+    planets[4].changeSpeed(speedMult);
+    planets[4].setTexture("res/planet_4.bmp");
+
+    // Saturn
+    planets[5].setParams(9.58f * orbitsScale + orbitsStart, 9.45f * diameterScale,
+                         (1/0.445f) * rotSpeedMult, 0.325f * revSpeedMult, 2.5, 26.7);
+    planets[5].changeSpeed(speedMult);
+    planets[5].setTexture("res/planet_5.bmp");
+
+    // Uranus
+    planets[6].setParams(19.2f * orbitsScale + orbitsStart, 4.01f * diameterScale,
+                         (1/0.72f) * rotSpeedMult, 0.228f * revSpeedMult, 0.8, 97.8);
+    planets[6].changeSpeed(speedMult);
+    planets[6].setTexture("res/planet_6.bmp");
+
+    // Neptune
+    planets[7].setParams(30.05f * orbitsScale + orbitsStart, 3.88f * diameterScale,
+                         (1/0.673f) * rotSpeedMult, 0.182f * revSpeedMult, 1.8, 28.3);
+    planets[7].changeSpeed(speedMult);
+    planets[7].setTexture("res/planet_7.bmp");
 
 }
 
 
-// KEYBOARD INPUT ("WASD" control)
-void keyOperations (void) {
+// Capture keyboard
+void keyOperations(void) {
 	// move forward by holding 'w'
 	if (keyStates['w'] && !keyStates['s']) {
 		float xrotrad, yrotrad;
-		yrotrad = (yrot / 180 * 3.141592654f);
-		xrotrad = (xrot / 180 * 3.141592654f);
-		xpos += float(sin(yrotrad)) / 10;
-		zpos -= float(cos(yrotrad)) / 10;
-		ypos -= float(sin(xrotrad)) / 10;
+		yrotrad = (yrot / 180 * pi);
+		xrotrad = (xrot / 180 * pi);
+		xpos += float(sin(yrotrad)) / movementSpeed;
+		zpos -= float(cos(yrotrad)) / movementSpeed;
+		ypos -= float(sin(xrotrad)) / movementSpeed;
 	}
+
 	// move backward by holding 's'
 	if (keyStates['s'] && !keyStates['w']) {
 		float xrotrad, yrotrad;
-		yrotrad = (yrot / 180 * 3.141592654f);
-		xrotrad = (xrot / 180 * 3.141592654f); 
-		xpos -= float(sin(yrotrad)) / 10;
-		zpos += float(cos(yrotrad)) / 10;
-		ypos += float(sin(xrotrad)) / 10;
+		yrotrad = (yrot / 180 * pi);
+		xrotrad = (xrot / 180 * pi);
+		xpos -= float(sin(yrotrad)) / movementSpeed;
+		zpos += float(cos(yrotrad)) / movementSpeed;
+		ypos += float(sin(xrotrad)) / movementSpeed;
 	}
+
 	// strafe right by holding 'd'
 	if (keyStates['d'] && !keyStates['a']) {
 		float yrotrad;
-		yrotrad = (yrot / 180 * 3.141592654f);
-		xpos += float(cos(yrotrad)) * 0.1;
-		zpos += float(sin(yrotrad)) * 0.1;
+		yrotrad = (yrot / 180 * pi);
+		xpos += float(cos(yrotrad)) / movementSpeed;
+		zpos += float(sin(yrotrad)) / movementSpeed;
 	}
+
 	// strafe left by holding 'a'
 	if (keyStates['a'] && !keyStates['d']) {
 		float yrotrad;
-		yrotrad = (yrot / 180 * 3.141592654f);
-		xpos -= float(cos(yrotrad)) * 0.1;
-		zpos -= float(sin(yrotrad)) * 0.1;
+		yrotrad = (yrot / 180 * pi);
+		xpos -= float(cos(yrotrad)) / movementSpeed;
+		zpos -= float(sin(yrotrad)) / movementSpeed;
 	}
-	// hit 'g' to generate a new system
-	if (keyStates['g']) { reset(); }
+
+    // move camera up by holding 'o'
+    if (keyStates['o'] && !keyStates['l']) {
+        xrot--;
+    }
+
+    // move camera down by holding 'l'
+    if (keyStates['l'] && !keyStates['o']) {
+        xrot++;
+    }
+
+    // move camera left by holding 'k'
+    if (keyStates['k'] && !keyStates[';']) {
+        yrot--;
+    }
+
+    // move camera right by holding ';'
+    if (keyStates[';'] && !keyStates['k']) {
+        yrot++;
+    }
+
 	// hit Esc to quit
 	if (keyStates[27]) { exit(0); }
 }
 
 
-// enables various protocols for rendering
+// Enable rendering properties of OpenGL.
 void initRendering(void) {
+    GLfloat light_diffuse[] = { 2, 2, 2, 0 };
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
+
+    GLfloat light_ambient[] = { 0.0, 0.0, 0.0, 0 };
+    glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
+
+    GLfloat light_specular[] = { 0, 0, 0, 0 };
+    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
+
 	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_LIGHTING);
-	glEnable(GL_LIGHT0);
+	glEnable(GL_LIGHTING); // Enable lighting for light related computations.
+	glEnable(GL_LIGHT0); // Enables light zero to be used as sun.
 	glEnable(GL_NORMALIZE);
 	glEnable(GL_COLOR_MATERIAL);
 	glShadeModel(GL_SMOOTH); // set the shader to smooth shader
 }
 
 
-// loads the sun texture and all planet textures into the system
-void loadScene(void) {
-	// set the parameters of sun and galaxy
-	sun = Planet(0.0f, 1.5f, 0.01f, 0.0f);
-	galaxy = Galaxy(60.0f);
-
-	// load all of the textures
-	sun.setTexture("res/sun.bmp");
-	planets[0].setTexture("res/planet_0.bmp");
-	planets[1].setTexture("res/planet_1.bmp");
-	planets[2].setTexture("res/planet_2.bmp");
-	planets[3].setTexture("res/planet_3.bmp");
-	planets[4].setTexture("res/planet_4.bmp");
-	planets[5].setTexture("res/planet_5.bmp");
-	planets[6].setTexture("res/planet_6.bmp");
-	planets[7].setTexture("res/planet_7.bmp");
-	galaxy.setTexture("res/galaxy.bmp");
-
-	// initialize the speed multiplier
-	speedMult = 1.0;
-}
-
-
-// camera rotation and translation commands for user interaction
-void updateCamera (void) {
+// Camera rotation and translation commands for user interaction
+void updateCamera(void) {
 	glRotatef(xrot, 1.0, 0.0, 0.0);  //rotate our camera on the x-axis (left and right)
 	glRotatef(yrot, 0.0, 1.0, 0.0);  //rotate our camera on the y-axis (up and down)
 	glTranslated(-xpos, -ypos, -zpos); //translate the screen to the position of our camera
 }
 
 
-// draws all objects in the scene
+// Drawing all scene.
 void drawScene(void) {
+    // Draw sun, galaxy and each of planets.
+	sun.draw(true);
 	galaxy.draw();
+	for (int i = 0; i < num_planets; i++)
+		planets[i].draw(false);
+
+    // Draw galaxy grid and planets orbit.
 	if (!keyStates[' ']) {
-		galaxy.drawGrid();
-	}
-	sun.draw();
-	for (int i = 0; i < num_planets; i++) {
-		planets[i].draw();
-		if (!keyStates[' ']) planets[i].drawOrbitPath();
-	}
-	for (int i = 0; i < num_asteroids; i++) {
-		asteroids[i].draw();
-		if (!keyStates[' ']) asteroids[0].drawOrbitPath();
+		// galaxy.drawGrid();
+        for (int i = 0; i < num_planets; i++)
+            planets[i].drawOrbitPath();
 	}
 }
 
@@ -159,21 +221,20 @@ void drawScene(void) {
 // display our solar system
 void display (void) {
 	keyOperations(); // set the keypress operations
-	glClearColor (0.0, 0.0, 0.0, 1.0); // clear the screen to black
-	glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the color buffer and the depth buffer
-
-	// enable the accumulation buffer for motion blur
-    glAccum(GL_RETURN, 0.85f);
-    glClear(GL_ACCUM_BUFFER_BIT);
+	glClearColor(0.0, 0.0, 0.0, 1.0); // clear the screen to black
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the color buffer and the depth buffer
 
 	glLoadIdentity();
-	glTranslatef(0, 0, -10);
 
 	updateCamera(); // set our camera position
-	
+
 	drawScene(); // draw the scene
 
-    glAccum(GL_ACCUM, 0.6f);
+
+
+    GLfloat light_position[] = { 0.0, 0.0, 0.0, 1.0 };
+    glLightfv(GL_LIGHT0, GL_POSITION, light_position);
+
 	glFlush();
 	glutSwapBuffers(); // swap the buffers
 }
@@ -187,7 +248,7 @@ void reshape (int w, int h) {
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	// set the perspective (angle of sight, width, height, depth)
-	gluPerspective(60, (GLfloat) w / (GLfloat) h, 0.1, 100.0);
+	gluPerspective(60, (GLfloat) w / (GLfloat) h, 0.1, 10000.0);
 	// set the matrix back to model
 	glMatrixMode(GL_MODELVIEW);
 }
@@ -200,60 +261,52 @@ void keyPressed (unsigned char key, int x, int y) {
 	
 	// set speed of system with number keys. exponential increase!
 	int speedChange = key - '0';
-	if (speedChange > 0 && speedChange < 10) {
+	if (speedChange >= 0 && speedChange < 10) {
 		sun.changeSpeed(speedChange);
 		for (int i = 0; i < num_planets; i++) {
 			planets[i].changeSpeed(speedChange);
 		}
-		for (int i = 0; i < num_asteroids; i++) {
-			asteroids[i].changeSpeed(speedChange);
-		}
 	}
+
+    // Movement speed change with q (faster), e (slower)
+    if (keyStates['q'] && !keyStates['e']) {
+        movementSpeed--;
+        if (movementSpeed < 1)
+            movementSpeed = 1;
+    }
+
+    if (keyStates['e'] && !keyStates['q']) {
+        movementSpeed++;
+        if (movementSpeed > 10)
+            movementSpeed = 10;
+    }
+
+
 }  
 
 
 // set a keypressed state to false when key is released
 void keyUp (unsigned char key, int x, int y) {  
 	keyStates[key] = false; // Set the state of the current key to not pressed  
-} 
-
-
-// mouse movement for camera control
-void mouseMovement(int x, int y) {
-	int diffx = x - lastx; // check the difference between the current x and the last x position
-	int diffy = y - lasty; // check the difference between the current y and the last y position
-	lastx = x; // set lastx to the current x position
-	lasty = y; // set lasty to the current y position
-	xrot += (float) diffy / 10; // set the xrot to xrot with the addition of the difference in the y position
-	yrot += (float) diffx / 10; // set the yrot to yrot with the addition of the difference in the x position
 }
 
 
 // main function
 int main (int argc, char **argv) {
-	srand(time(NULL));
 	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_DOUBLE | GLUT_DEPTH | GLUT_ACCUM); 
+	glutInitDisplayMode(GLUT_DOUBLE | GLUT_DEPTH);
 	glutInitWindowSize(960, 540); 
 	glutInitWindowPosition (100, 100);
-	glutCreateWindow("TeapotSun - adg2160");
-	initRendering();
-	
-	loadScene();
-	reset(); // set all initial values
+	glutCreateWindow("Solar System Simulation by Amir Khazaie (733amir@gmail.com)");
 
-	// OPTIONAL for entering fullscreen mode
-	//glutGameModeString( "1920×1080:32@75" );
-	//glutEnterGameMode();
+	initRendering();
+    galaxyInitialization();
 
 	glutDisplayFunc(display); 
-	glutIdleFunc(display); 
+	glutIdleFunc(display);
 	glutReshapeFunc(reshape);
-	glutMotionFunc(mouseMovement); // click mouse to enable camera control
-	glutKeyboardFunc(keyPressed);   
-	glutKeyboardUpFunc(keyUp); 
-
-	//glutSetCursor(GLUT_CURSOR_NONE); // hide mouse cursor
+	glutKeyboardFunc(keyPressed);
+	glutKeyboardUpFunc(keyUp);
 
 	glutMainLoop();
 	return 0;
